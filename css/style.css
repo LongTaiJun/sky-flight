@@ -967,3 +967,269 @@ canvas {
         transform: translateY(0);
     }
 }
+
+/* Flight Phase Indicator */
+.hud-flight-phase {
+    position: absolute;
+    top: 140px;
+    left: 50%;
+    transform: translateX(-50%);
+    padding: 0.5rem 1.5rem;
+    background: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(5px);
+    border-radius: 20px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.phase-value {
+    font-size: 0.9rem;
+    font-weight: bold;
+    letter-spacing: 2px;
+    color: #00ff88;
+}
+
+.phase-value.phase-taxiing {
+    color: #ffcc00;
+}
+
+.phase-value.phase-takeoff_roll {
+    color: #ff8800;
+    animation: pulse 0.5s ease-in-out infinite;
+}
+
+.phase-value.phase-climbing {
+    color: #00aaff;
+}
+
+.phase-value.phase-flying {
+    color: #00ff88;
+}
+
+.phase-value.phase-descending {
+    color: #ff8888;
+}
+
+.phase-value.phase-landing {
+    color: #ffcc00;
+}
+
+/* Vertical Speed Indicator */
+.hud-vsi {
+    position: absolute;
+    top: 50%;
+    right: 20px;
+    transform: translateY(-50%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 0.5rem;
+    background: rgba(0, 0, 0, 0.4);
+    backdrop-filter: blur(5px);
+    border-radius: 10px;
+    min-width: 50px;
+}
+
+.vsi-label {
+    font-size: 0.6rem;
+    color: rgba(255, 255, 255, 0.5);
+    margin-bottom: 0.2rem;
+}
+
+.vsi-value {
+    font-size: 1.1rem;
+    font-weight: bold;
+    font-family: monospace;
+}
+
+.vsi-unit {
+    font-size: 0.6rem;
+    color: rgba(255, 255, 255, 0.5);
+}
+
+.vsi-indicator {
+    width: 8px;
+    height: 60px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 4px;
+    margin-top: 0.5rem;
+    position: relative;
+    overflow: hidden;
+}
+
+.vsi-bar {
+    position: absolute;
+    bottom: 50%;
+    left: 0;
+    width: 100%;
+    height: 0;
+    background: #00ff88;
+    border-radius: 4px;
+    transition: height 0.1s ease;
+}
+
+.vsi-bar.climbing {
+    bottom: 50%;
+    background: linear-gradient(to top, #00aaff, #00ff88);
+}
+
+.vsi-bar.descending {
+    top: 50%;
+    bottom: auto;
+    background: linear-gradient(to bottom, #ff8800, #ff4444);
+}
+
+/* Attitude Indicator */
+.hud-attitude {
+    position: absolute;
+    top: 50%;
+    left: 20px;
+    transform: translateY(-50%);
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    background: linear-gradient(to bottom, #00aaff 50%, #553300 50%);
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    overflow: hidden;
+}
+
+.attitude-horizon {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(to bottom, #00aaff 50%, #553300 50%);
+    transition: transform 0.1s ease;
+}
+
+.attitude-aircraft {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 40px;
+    height: 4px;
+    background: #ffffff;
+    z-index: 2;
+}
+
+.attitude-aircraft::before,
+.attitude-aircraft::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    width: 12px;
+    height: 4px;
+    background: #ffffff;
+    transform: translateY(-50%);
+}
+
+.attitude-aircraft::before {
+    left: -8px;
+}
+
+.attitude-aircraft::after {
+    right: -8px;
+}
+
+.attitude-marker {
+    position: absolute;
+    top: 50%;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: rgba(255, 255, 255, 0.3);
+    z-index: 1;
+}
+
+/* Speed Lines Effect */
+.speed-lines {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 40;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    overflow: hidden;
+}
+
+.speed-lines.active {
+    opacity: 1;
+}
+
+.speed-line {
+    position: absolute;
+    top: -20%;
+    width: 2px;
+    height: 20%;
+    background: linear-gradient(to bottom, transparent, rgba(255, 255, 255, 0.5), transparent);
+    animation: speed-line-fall 0.4s linear infinite;
+    opacity: 0;
+}
+
+.speed-lines.active .speed-line {
+    opacity: 1;
+}
+
+@keyframes speed-line-fall {
+    0% {
+        top: -20%;
+        opacity: 0;
+    }
+    10% {
+        opacity: 0.7;
+    }
+    90% {
+        opacity: 0.7;
+    }
+    100% {
+        top: 100%;
+        opacity: 0;
+    }
+}
+
+/* Mobile responsive adjustments for new HUD elements */
+@media (max-width: 768px) {
+    .hud-attitude {
+        width: 60px;
+        height: 60px;
+        left: 15px;
+    }
+    
+    .attitude-aircraft {
+        width: 30px;
+    }
+    
+    .hud-vsi {
+        right: 15px;
+        min-width: 40px;
+    }
+    
+    .hud-flight-phase {
+        top: 120px;
+        padding: 0.3rem 1rem;
+    }
+    
+    .phase-value {
+        font-size: 0.75rem;
+    }
+}
+
+@media (max-height: 500px) and (orientation: landscape) {
+    .hud-attitude {
+        display: none;
+    }
+    
+    .hud-vsi {
+        top: 60px;
+        transform: none;
+    }
+    
+    .hud-flight-phase {
+        top: auto;
+        bottom: 60px;
+    }
+}

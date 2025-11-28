@@ -43,6 +43,16 @@ const Camera = {
         fov: 60
     },
     
+    // Camera shake
+    shake: {
+        intensity: 0,
+        time: 0
+    },
+    
+    // Speed effect
+    baseFOV: 60,
+    currentFOV: 60,
+    
     /**
      * Initialize camera
      * @param {THREE.PerspectiveCamera} camera
@@ -124,9 +134,27 @@ const Camera = {
                 t
             );
             
-            this.camera.fov = this.state.fov;
-            this.camera.updateProjectionMatrix();
+            this.baseFOV = this.state.fov;
         }
+        
+        // Speed-based FOV effect (speed sense)
+        const speedRatio = aircraft.state.speed / aircraft.currentType.maxSpeed;
+        const targetFOV = this.baseFOV + speedRatio * 15; // Max +15 degrees at max speed
+        this.currentFOV = THREE.MathUtils.lerp(this.currentFOV, targetFOV, 0.05);
+        this.camera.fov = this.currentFOV;
+        this.camera.updateProjectionMatrix();
+        
+        // Camera shake during takeoff phases
+        const flightPhase = aircraft.getFlightPhase();
+        if (flightPhase === 'takeoff_roll' || flightPhase === 'climbing') {
+            this.shake.intensity = 0.05;
+        } else if (flightPhase === 'taxiing') {
+            this.shake.intensity = 0.02;
+        } else {
+            this.shake.intensity = THREE.MathUtils.lerp(this.shake.intensity, 0, 0.05);
+        }
+        
+        this.shake.time += deltaTime * 20;
         
         // Get aircraft position and orientation
         const aircraftPos = aircraft.group.position.clone();
@@ -161,8 +189,19 @@ const Camera = {
                 .add(upOffset)
                 .add(backOffset);
             
-            // Smooth camera follow
-            this.camera.position.lerp(targetPos, 0.1);
+            // Smoother camera follow - reduced from 0.1 to 0.03
+            this.camera.position.lerp(targetPos, 0.03);
+            
+            // Apply camera shake
+            if (this.shake.intensity > 0.001) {
+                const shakeX = Math.sin(this.shake.time) * this.shake.intensity;
+                const shakeY = Math.cos(this.shake.time * 1.3) * this.shake.intensity;
+                this.camera.position.add(up.clone().multiplyScalar(shakeY));
+                
+                const right = new THREE.Vector3().crossVectors(up, backward).normalize();
+                this.camera.position.add(right.multiplyScalar(shakeX));
+            }
+            
             this.camera.lookAt(aircraftPos);
             this.camera.up.copy(up);
             
@@ -177,7 +216,7 @@ const Camera = {
                 .add(upOffset)
                 .add(backOffset);
             
-            this.camera.position.lerp(targetPos, 0.05);
+            this.camera.position.lerp(targetPos, 0.03);
             this.camera.lookAt(aircraftPos);
             this.camera.up.copy(up);
         }
