@@ -409,12 +409,25 @@ const SettingsUI = {
      * @param {string} value
      */
     updateActiveButton(section, value) {
-        // This is a simple refresh - in production you might want to be more precise
-        const buttons = document.querySelectorAll(`.settings-section .option-btn`);
-        buttons.forEach(btn => {
-            const btnValue = btn.getAttribute('onclick')?.match(/'(\w+)'/)?.[1];
-            if (btnValue === value) {
-                btn.classList.add('active');
+        // Find the section by matching the setting name in onclick handlers
+        const sections = document.querySelectorAll('.settings-section');
+        sections.forEach(sectionEl => {
+            const buttons = sectionEl.querySelectorAll('.option-btn');
+            const sectionMatches = Array.from(buttons).some(btn => {
+                const onclick = btn.getAttribute('onclick') || '';
+                return onclick.includes(section);
+            });
+            
+            if (sectionMatches) {
+                // Remove active from all buttons in this section
+                buttons.forEach(btn => btn.classList.remove('active'));
+                // Add active to the matching button
+                buttons.forEach(btn => {
+                    const btnValue = btn.getAttribute('onclick')?.match(/'(\w+)'/)?.[1];
+                    if (btnValue === value) {
+                        btn.classList.add('active');
+                    }
+                });
             }
         });
     }

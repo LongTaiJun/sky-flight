@@ -123,7 +123,16 @@ const Settings = {
      * @returns {Object} Quality configuration
      */
     getQualityConfig() {
-        return this.qualityConfig || this.defaults.qualityConfig;
+        // Ensure qualityConfig is set, fall back to high quality defaults
+        if (!this.qualityConfig) {
+            this.applyQualitySettings();
+        }
+        return this.qualityConfig || {
+            pixelRatio: window.devicePixelRatio,
+            shadowMapEnabled: true,
+            antialias: true,
+            textureQuality: 1
+        };
     },
     
     /**
