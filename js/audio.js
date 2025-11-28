@@ -369,7 +369,8 @@ const Audio = {
      * @param {number} volume - 0 to 1
      */
     setMasterVolume(volume) {
-        this.settings.masterVolume = THREE.MathUtils.clamp(volume, 0, 1);
+        // Use Math.max/min for compatibility without THREE dependency
+        this.settings.masterVolume = Math.max(0, Math.min(1, volume));
         if (this.masterGain) {
             this.masterGain.gain.value = this.settings.masterVolume;
         }

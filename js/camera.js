@@ -138,7 +138,8 @@ const Camera = {
         }
         
         // Speed-based FOV effect (speed sense)
-        const speedRatio = aircraft.state.speed / aircraft.currentType.maxSpeed;
+        const maxSpeed = aircraft.currentType ? aircraft.currentType.maxSpeed : 1000;
+        const speedRatio = aircraft.state.speed / maxSpeed;
         const targetFOV = this.baseFOV + speedRatio * 15; // Max +15 degrees at max speed
         this.currentFOV = THREE.MathUtils.lerp(this.currentFOV, targetFOV, 0.05);
         this.camera.fov = this.currentFOV;
