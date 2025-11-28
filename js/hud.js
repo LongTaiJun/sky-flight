@@ -63,6 +63,28 @@ const HUD = {
                 <span data-i18n="thirdPerson">${I18n.t('thirdPerson')}</span>
             </div>
             
+            <!-- Flight phase indicator -->
+            <div class="hud-flight-phase" id="hud-flight-phase">
+                <span class="phase-value" id="phase-name">READY</span>
+            </div>
+            
+            <!-- Attitude indicator -->
+            <div class="hud-attitude" id="hud-attitude">
+                <div class="attitude-horizon" id="attitude-horizon"></div>
+                <div class="attitude-aircraft"></div>
+                <div class="attitude-marker"></div>
+            </div>
+            
+            <!-- Vertical speed indicator -->
+            <div class="hud-vsi" id="hud-vsi">
+                <span class="vsi-label">V/S</span>
+                <span class="vsi-value" id="vsi-value">0</span>
+                <span class="vsi-unit">m/s</span>
+                <div class="vsi-indicator">
+                    <div class="vsi-bar" id="vsi-bar"></div>
+                </div>
+            </div>
+            
             <!-- Bottom info bar -->
             <div class="hud-bottom">
                 <div class="hud-info-item">
@@ -88,6 +110,9 @@ const HUD = {
                 <span class="dest-label" data-i18n="destination">${I18n.t('destination')}</span>
                 <span class="dest-value" id="dest-name" data-i18n="noDestination">${I18n.t('noDestination')}</span>
             </div>
+            
+            <!-- Speed lines container -->
+            <div class="speed-lines" id="speed-lines"></div>
         `;
         
         document.body.appendChild(hud);
@@ -101,8 +126,36 @@ const HUD = {
             time: document.getElementById('hud-time'),
             compass: document.getElementById('compass-value'),
             destination: document.getElementById('dest-name'),
-            view: document.getElementById('hud-view')
+            view: document.getElementById('hud-view'),
+            flightPhase: document.getElementById('phase-name'),
+            vsiValue: document.getElementById('vsi-value'),
+            vsiBar: document.getElementById('vsi-bar'),
+            attitudeHorizon: document.getElementById('attitude-horizon'),
+            speedLines: document.getElementById('speed-lines')
         };
+        
+        // Initialize speed lines
+        this.initSpeedLines();
+        
+        // Listen for flight phase changes
+        window.addEventListener('flightPhaseChanged', (e) => {
+            this.updateFlightPhase(e.detail.phase);
+        });
+    },
+    
+    /**
+     * Initialize speed lines effect
+     */
+    initSpeedLines() {
+        if (!this.elements.speedLines) return;
+        
+        for (let i = 0; i < 20; i++) {
+            const line = document.createElement('div');
+            line.className = 'speed-line';
+            line.style.left = `${Math.random() * 100}%`;
+            line.style.animationDelay = `${Math.random() * 0.5}s`;
+            this.elements.speedLines.appendChild(line);
+        }
     },
     
     /**
@@ -120,6 +173,31 @@ const HUD = {
         // Speed
         if (this.elements.speed && data.speed !== undefined) {
             this.elements.speed.textContent = `${Math.round(data.speed)} km/h`;
+            
+            // Update speed lines visibility based on speed
+            this.updateSpeedLines(data.speed, data.maxSpeed || 1000);
+        }
+        
+        // Vertical speed
+        if (this.elements.vsiValue && data.verticalSpeed !== undefined) {
+            // Convert from km/h to m/s (approx)
+            const vsMs = Math.round(data.verticalSpeed * 1000 / 3600);
+            const sign = vsMs > 0 ? '+' : '';
+            this.elements.vsiValue.textContent = `${sign}${vsMs}`;
+            
+            // Update VSI bar
+            if (this.elements.vsiBar) {
+                const barHeight = Math.min(Math.abs(vsMs) / 50, 1) * 50;
+                this.elements.vsiBar.style.height = `${barHeight}%`;
+                this.elements.vsiBar.className = `vsi-bar ${vsMs > 0 ? 'climbing' : vsMs < 0 ? 'descending' : ''}`;
+            }
+        }
+        
+        // Pitch for attitude indicator
+        if (this.elements.attitudeHorizon && data.pitch !== undefined) {
+            // Map pitch (-90 to 90) to translate percentage
+            const translateY = data.pitch * 0.5; // ±45% translation
+            this.elements.attitudeHorizon.style.transform = `translateY(${translateY}%)`;
         }
         
         // Distance to destination
@@ -161,6 +239,47 @@ const HUD = {
                 arrow.style.transform = `translate(-50%, -50%) rotate(${heading}deg)`;
             }
         }
+    },
+    
+    /**
+     * Update speed lines effect
+     * @param {number} speed - Current speed
+     * @param {number} maxSpeed - Maximum speed
+     */
+    updateSpeedLines(speed, maxSpeed) {
+        if (!this.elements.speedLines) return;
+        
+        const speedRatio = speed / maxSpeed;
+        
+        // Show speed lines only at high speed (>50%)
+        if (speedRatio > 0.5) {
+            const opacity = (speedRatio - 0.5) * 2; // 0 at 50%, 1 at 100%
+            this.elements.speedLines.style.opacity = opacity;
+            this.elements.speedLines.classList.add('active');
+        } else {
+            this.elements.speedLines.classList.remove('active');
+        }
+    },
+    
+    /**
+     * Update flight phase display
+     * @param {string} phase
+     */
+    updateFlightPhase(phase) {
+        if (!this.elements.flightPhase) return;
+        
+        const phaseNames = {
+            'idle': 'READY',
+            'taxiing': 'TAXIING',
+            'takeoff_roll': 'TAKEOFF',
+            'climbing': 'CLIMBING',
+            'flying': 'CRUISING',
+            'descending': 'DESCENDING',
+            'landing': 'LANDING'
+        };
+        
+        this.elements.flightPhase.textContent = phaseNames[phase] || phase.toUpperCase();
+        this.elements.flightPhase.className = `phase-value phase-${phase}`;
     },
     
     /**

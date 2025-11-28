@@ -151,6 +151,11 @@ const Game = {
         // Initialize Earth
         await Earth.init(this.scene);
         
+        // Initialize Clouds
+        if (typeof Clouds !== 'undefined') {
+            Clouds.init(this.scene);
+        }
+        
         // Initialize Aircraft
         Aircraft.init(this.scene);
         
@@ -165,6 +170,11 @@ const Game = {
         
         // Initialize HUD
         HUD.init();
+        
+        // Initialize Audio
+        if (typeof Audio !== 'undefined') {
+            Audio.init();
+        }
         
         // Setup control callbacks
         Controls.onViewChange(() => {
@@ -356,6 +366,16 @@ const Game = {
             // Update camera to follow aircraft
             Camera.update(Aircraft, deltaTime);
             
+            // Update clouds
+            if (typeof Clouds !== 'undefined' && Clouds.group) {
+                Clouds.update(deltaTime, Aircraft);
+            }
+            
+            // Update audio
+            if (typeof Audio !== 'undefined') {
+                Audio.update(Aircraft, deltaTime);
+            }
+            
             // Update day/night based on aircraft position
             const position = Aircraft.getPosition();
             const dayNightMode = Settings.get('dayNightMode');
@@ -363,10 +383,14 @@ const Game = {
             
             // Update HUD
             const state = Aircraft.getState();
+            const currentType = Aircraft.getCurrentType();
             HUD.update({
                 altitude: state.altitude,
                 speed: state.speed,
                 heading: state.heading,
+                pitch: state.pitch,
+                verticalSpeed: state.verticalSpeed,
+                maxSpeed: currentType ? currentType.maxSpeed : 1000,
                 distance: Aircraft.getDistanceToDestination(),
                 flightTime: Aircraft.getFlightTime()
             });

@@ -59,7 +59,19 @@ const Aircraft = {
         isFlying: false,
         takeoffAirport: null,
         destinationAirport: null,
-        flightStartTime: null
+        flightStartTime: null,
+        verticalSpeed: 0 // km/h vertical rate
+    },
+    
+    // Flight phase: idle, taxiing, takeoff_roll, climbing, flying, descending, landing
+    flightPhase: 'idle',
+    phaseStartTime: 0,
+    
+    // Phase durations in ms
+    phaseDurations: {
+        taxiing: 3000,
+        takeoff_roll: 3000,
+        climbing: 3000
     },
     
     // Control inputs
@@ -337,21 +349,29 @@ const Aircraft = {
         const spec = this.currentType;
         const handling = spec.handling;
         
-        // Apply control inputs to rotation
-        this.state.pitch += this.input.pitch * handling * 60 * deltaTime;
-        this.state.roll += this.input.roll * handling * 60 * deltaTime;
-        this.state.heading += this.input.yaw * handling * 30 * deltaTime;
+        // Handle flight phase transitions
+        this.updateFlightPhase(deltaTime);
         
-        // Bank affects heading (coordinated turn)
-        this.state.heading += this.state.roll * 0.5 * deltaTime;
+        // During takeoff phases, limit control input
+        const canControl = this.flightPhase === 'flying' || this.flightPhase === 'descending';
         
-        // Apply throttle to speed
-        const targetSpeed = this.state.speed + this.input.throttle * 200;
-        this.state.speed = THREE.MathUtils.clamp(
-            this.state.speed + (targetSpeed - this.state.speed) * deltaTime,
-            spec.minSpeed,
-            spec.maxSpeed
-        );
+        if (canControl) {
+            // Apply control inputs to rotation
+            this.state.pitch += this.input.pitch * handling * 60 * deltaTime;
+            this.state.roll += this.input.roll * handling * 60 * deltaTime;
+            this.state.heading += this.input.yaw * handling * 30 * deltaTime;
+            
+            // Bank affects heading (coordinated turn)
+            this.state.heading += this.state.roll * 0.5 * deltaTime;
+            
+            // Apply throttle to speed
+            const targetSpeed = this.state.speed + this.input.throttle * 200;
+            this.state.speed = THREE.MathUtils.clamp(
+                this.state.speed + (targetSpeed - this.state.speed) * deltaTime,
+                spec.minSpeed,
+                spec.maxSpeed
+            );
+        }
         
         // Clamp angles
         this.state.pitch = THREE.MathUtils.clamp(this.state.pitch, -80, 80);
@@ -359,16 +379,17 @@ const Aircraft = {
         this.state.heading = (this.state.heading + 360) % 360;
         
         // Auto-stabilize when no input
-        if (this.input.pitch === 0) {
+        if (this.input.pitch === 0 && canControl) {
             this.state.pitch *= 0.98;
         }
-        if (this.input.roll === 0) {
+        if (this.input.roll === 0 && canControl) {
             this.state.roll *= 0.98;
         }
         
         // Calculate velocity based on heading and pitch
+        // Increased speed scaling factor from 0.01 to 0.1 for visible movement
         const speedInUnits = this.state.speed / 3600 * deltaTime; // km/h to km/s * delta
-        const scaledSpeed = speedInUnits * 0.01; // Scale for scene
+        const scaledSpeed = speedInUnits * 0.1; // Increased scale for better visibility
         
         const pitchRad = THREE.MathUtils.degToRad(this.state.pitch);
         const headingRad = THREE.MathUtils.degToRad(this.state.heading);
@@ -387,6 +408,9 @@ const Aircraft = {
         const minAltitude = Earth.sceneRadius + 0.5;
         const maxAltitude = Earth.sceneRadius + 50;
         
+        // Calculate vertical speed
+        const prevAltitude = this.state.altitude;
+        
         if (distFromCenter < minAltitude) {
             this.state.position.normalize().multiplyScalar(minAltitude);
             this.state.altitude = 0.5;
@@ -396,6 +420,9 @@ const Aircraft = {
         } else {
             this.state.altitude = distFromCenter - Earth.sceneRadius;
         }
+        
+        // Update vertical speed (km/h)
+        this.state.verticalSpeed = (this.state.altitude - prevAltitude) / deltaTime * 3600;
         
         // Update mesh position and rotation
         this.group.position.copy(this.state.position);
@@ -418,6 +445,89 @@ const Aircraft = {
         
         this.group.quaternion.setFromRotationMatrix(matrix);
         this.mesh.rotation.copy(localRotation);
+    },
+    
+    /**
+     * Update flight phase state machine
+     * @param {number} deltaTime
+     */
+    updateFlightPhase(deltaTime) {
+        const now = Date.now();
+        const phaseElapsed = now - this.phaseStartTime;
+        
+        switch (this.flightPhase) {
+            case 'taxiing':
+                // Accelerate to 30% of cruise speed
+                const taxiSpeed = this.currentType.speed * 0.3;
+                this.state.speed = THREE.MathUtils.lerp(this.state.speed, taxiSpeed, deltaTime * 2);
+                this.state.pitch = 0;
+                this.state.roll = 0;
+                
+                if (phaseElapsed >= this.phaseDurations.taxiing) {
+                    this.setFlightPhase('takeoff_roll');
+                }
+                break;
+                
+            case 'takeoff_roll':
+                // Accelerate to takeoff speed
+                const takeoffSpeed = this.currentType.speed * 0.8;
+                this.state.speed = THREE.MathUtils.lerp(this.state.speed, takeoffSpeed, deltaTime * 3);
+                this.state.pitch = 0;
+                this.state.roll = 0;
+                
+                if (phaseElapsed >= this.phaseDurations.takeoff_roll) {
+                    this.setFlightPhase('climbing');
+                }
+                break;
+                
+            case 'climbing':
+                // Rotate up and climb
+                this.state.speed = THREE.MathUtils.lerp(this.state.speed, this.currentType.speed, deltaTime * 2);
+                this.state.pitch = THREE.MathUtils.lerp(this.state.pitch, 15, deltaTime * 2);
+                this.state.roll = 0;
+                
+                // Increase altitude
+                const targetAltitude = 10;
+                if (this.state.altitude < targetAltitude) {
+                    const climbRate = 0.1 * deltaTime;
+                    this.state.position.normalize().multiplyScalar(Earth.sceneRadius + this.state.altitude + climbRate);
+                    this.state.altitude += climbRate;
+                }
+                
+                if (phaseElapsed >= this.phaseDurations.climbing) {
+                    this.setFlightPhase('flying');
+                }
+                break;
+                
+            case 'flying':
+                // Normal flight - player has control
+                break;
+                
+            case 'descending':
+                // Auto-descend towards destination
+                this.state.pitch = THREE.MathUtils.lerp(this.state.pitch, -5, deltaTime);
+                break;
+                
+            case 'landing':
+                // Final approach
+                this.state.speed = THREE.MathUtils.lerp(this.state.speed, this.currentType.minSpeed, deltaTime * 2);
+                this.state.pitch = THREE.MathUtils.lerp(this.state.pitch, -3, deltaTime * 2);
+                break;
+        }
+    },
+    
+    /**
+     * Set flight phase
+     * @param {string} phase
+     */
+    setFlightPhase(phase) {
+        this.flightPhase = phase;
+        this.phaseStartTime = Date.now();
+        
+        // Dispatch event for UI updates
+        window.dispatchEvent(new CustomEvent('flightPhaseChanged', {
+            detail: { phase }
+        }));
     },
     
     /**
@@ -444,18 +554,23 @@ const Aircraft = {
      * @param {Object} airport - Airport data
      */
     takeoff(airport) {
-        const position = Earth.latLonToVector3(airport.lat, airport.lon, 2);
+        // Start on runway at ground level
+        const position = Earth.latLonToVector3(airport.lat, airport.lon, 0.5);
         this.state.position.copy(position);
-        this.state.altitude = 2;
+        this.state.altitude = 0.5;
         this.state.heading = 0;
         this.state.pitch = 0;
         this.state.roll = 0;
-        this.state.speed = this.currentType.speed;
+        this.state.speed = 0; // Start from standstill
+        this.state.verticalSpeed = 0;
         this.state.isFlying = true;
         this.state.takeoffAirport = airport;
         this.state.flightStartTime = Date.now();
         
         this.group.position.copy(this.state.position);
+        
+        // Start takeoff sequence
+        this.setFlightPhase('taxiing');
     },
     
     /**
@@ -522,5 +637,13 @@ const Aircraft = {
      */
     getCurrentType() {
         return this.currentType;
+    },
+    
+    /**
+     * Get current flight phase
+     * @returns {string}
+     */
+    getFlightPhase() {
+        return this.flightPhase;
     }
 };
