@@ -1,0 +1,37 @@
+# Dependencies
+node_modules/
+
+# Build artifacts
+lib/
+dist/
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Package lock files (optional - some projects prefer to track these)
+# package-lock.json
+
+# Logs
+*.log
+npm-debug.log*
+
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# Coverage directory
+coverage/
+
+# Temporary files
+tmp/
+temp/
